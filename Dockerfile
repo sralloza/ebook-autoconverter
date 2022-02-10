@@ -1,7 +1,7 @@
 FROM linuxserver/calibre
 
 ENV GET_POETRY https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py
-
+ENV POETRY_VIRTUALENVS_CREATE=false
 
 RUN apt update && \
     apt upgrade -y && \
@@ -12,8 +12,7 @@ WORKDIR /code
 # Install Poetry
 RUN curl -sSL ${GET_POETRY} | POETRY_HOME=/opt/poetry python3 && \
     cd /usr/local/bin && \
-    ln -s /opt/poetry/bin/poetry && \
-    poetry config virtualenvs.create false
+    ln -s /opt/poetry/bin/poetry
 
 COPY ./pyproject.toml ./poetry.lock* /code/
 
@@ -23,5 +22,4 @@ COPY ebook_autoconverter /code/ebook_autoconverter/
 
 RUN poetry install --no-dev
 
-ENTRYPOINT [ "python3" ]
-CMD [ "-m", "ebook_autoconverter" ]
+ENTRYPOINT [ "python3", "-m", "ebook_autoconverter" ]

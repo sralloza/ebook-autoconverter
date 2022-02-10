@@ -12,8 +12,14 @@ from .network import get_session
 def login():
     session = get_session()
     res = session.get(URL + "/login")
+    res.raise_for_status()
     soup = BeautifulSoup(res.text, "html.parser")
-    token = soup.find("input", {"name": "csrf_token"})["value"]
+    token_container = soup.find("input", {"name": "csrf_token"})
+
+    if token_container is None:
+        raise ValueError(f"Can't find token (res={res}, url={res.url})")
+
+    token = token_container["value"]
 
     data = {
         "next": "/",
@@ -29,6 +35,7 @@ def login():
 def get_books():
     session = get_session()
     res = session.get(URL)
+    res.raise_for_status()
     soup = BeautifulSoup(res.text, "html.parser")
 
     pags = soup.find("div", {"class": "pagination"})
@@ -91,7 +98,12 @@ def convert_and_upload_book(book_id: int):
     res2 = session.get(URL + f"/admin/book/{book_id}")
     res2.raise_for_status()
     soup = BeautifulSoup(res2.text, "html.parser")
-    token = soup.find("input", {"name": "csrf_token"})["value"]
+    token_container = soup.find("input", {"name": "csrf_token"})
+
+    if token_container is None:
+        raise ValueError(f"Can't find token (res={res2}, url={res2.url})")
+
+    token = token_container["token"]
 
     files = {"btn-upload-format": open(azw3_path, "rb")}
     data = {"csrf_token": token}
