@@ -5,4 +5,6 @@ from requests import Session
 
 @lru_cache()
 def get_session():
-    return Session()
+    session = Session()
+    session.headers.update({"User-Agent": "ebook-autoconverter"})
+    return session

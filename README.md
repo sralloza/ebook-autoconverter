@@ -28,12 +28,16 @@ Using `-e` flags:
 docker run -e CALIBRE_WEB_URL=XXXXX -e CALIBRE_WEB_USERNAME=USER -e CALIBRE_WEB_PASSWORD=PASSWORD sralloza/ebook-autoconverter:$VERSION
 ```
 
-Using .env file:
+Using `.env` file:
 
 ```shell
+docker run --env-file ebook-autoconverter.env sralloza/ebook-autoconverter:$VERSION
 ```
 
-ebook-autoconverter.env contents:
+`ebook-autoconverter.env` contents:
 
 ```text
+CALIBRE_WEB_URL=http://127.0.0.1
+CALIBRE_WEB_USERNAME=admin
+CALIBRE_WEB_PASSWORD=admin123
 ```
