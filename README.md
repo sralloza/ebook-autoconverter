@@ -10,7 +10,7 @@ In order to run it, the following env vars must be set:
 
 There are others optional env vars:
 
-- `FORCE_CONVERSION`: if `true` the script will convert and update **all** books, not just the ones without an azw3 version.
+- `FORCE_CONVERSION`: if `true` the script will convert and update **all** books, not just the ones without an `azw3` version.
 
 ## Development
 
@@ -18,6 +18,7 @@ There are others optional env vars:
 
 ```shell
 docker build -t sralloza/ebook-autoconverter:$VERSION .
+docker push sralloza/ebook-autoconverter:$VERSION
 ```
 
 ## Run container
@@ -25,16 +26,16 @@ docker build -t sralloza/ebook-autoconverter:$VERSION .
 Using `-e` flags:
 
 ```shell
-docker run -e CALIBRE_WEB_URL=XXXXX -e CALIBRE_WEB_USERNAME=USER -e CALIBRE_WEB_PASSWORD=PASSWORD sralloza/ebook-autoconverter:$VERSION
+docker run --rm -e CALIBRE_WEB_URL=XXXXX -e CALIBRE_WEB_USERNAME=USER -e CALIBRE_WEB_PASSWORD=PASSWORD sralloza/ebook-autoconverter:$VERSION
 ```
 
 Using `.env` file:
 
 ```shell
-docker run --env-file ebook-autoconverter.env sralloza/ebook-autoconverter:$VERSION
+docker run --rm --env-file .env sralloza/ebook-autoconverter:$VERSION
 ```
 
-`ebook-autoconverter.env` contents:
+`.env` contents:
 
 ```text
 CALIBRE_WEB_URL=http://127.0.0.1
