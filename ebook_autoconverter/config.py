@@ -11,3 +11,4 @@ except KeyError as exc:
     sys.exit(1)
 
 FORCE_CONVERSION = os.getenv("FORCE_CONVERSION", "").lower() == "true"
+DISABLE_LOGIN_TOKEN = os.getenv("DISABLE_LOGIN_TOKEN", "").lower() == "true"

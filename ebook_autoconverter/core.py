@@ -1,12 +1,29 @@
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from bs4 import BeautifulSoup
 from requests import Response
 
 from .calibre import convert_ebook
-from .config import FORCE_CONVERSION, PASSWORD, URL, USERNAME
+from .config import FORCE_CONVERSION, PASSWORD, URL, USERNAME, DISABLE_LOGIN_TOKEN
 from .network import get_session
+
+
+def get_token(soup: BeautifulSoup, res: Response) -> Optional[str]:
+    if DISABLE_LOGIN_TOKEN:
+        return None
+
+    token_container = soup.find("input", {"name": "csrf_token"})
+
+    if token_container is None:
+        raise ValueError(f"Can't find token (res={res}, url={res.url})")
+
+    try:
+        return token_container["value"]
+    except KeyError as exc:
+        raise KeyError(
+            f"Can't get token from token container ({token_container})"
+        ) from exc
 
 
 def login():
@@ -14,25 +31,17 @@ def login():
     res = session.get(URL + "/login")
     res.raise_for_status()
     soup = BeautifulSoup(res.text, "html.parser")
-    token_container = soup.find("input", {"name": "csrf_token"})
 
-    if token_container is None:
-        raise ValueError(f"Can't find token (res={res}, url={res.url})")
-
-    try:
-        token = token_container["value"]
-    except KeyError as exc:
-        raise KeyError(
-            f"Can't get token from token container ({token_container})"
-        ) from exc
-
+    token = get_token(soup, res)
     data = {
         "next": "/",
-        "csrf_token": token,
         "username": USERNAME,
         "password": PASSWORD,
         "submit": "",
     }
+    if token:
+        data["csrf_token"] = token
+
     res = session.post(URL + "/login", data=data)
     res.raise_for_status()
 
@@ -108,20 +117,10 @@ def convert_and_upload_book(book_id: int):
     res2 = session.get(URL + f"/admin/book/{book_id}")
     res2.raise_for_status()
     soup = BeautifulSoup(res2.text, "html.parser")
-    token_container = soup.find("input", {"name": "csrf_token"})
-
-    if token_container is None:
-        raise ValueError(f"Can't find token (res={res2}, url={res2.url})")
-
-    try:
-        token = token_container["value"]
-    except KeyError as exc:
-        raise KeyError(
-            f"Can't get token from token container ({token_container})"
-        ) from exc
+    token = get_token(soup, res2)
 
     files = {"btn-upload-format": open(azw3_path, "rb")}
-    data = {"csrf_token": token}
+    data = {"csrf_token": token} if token else {}
 
     res3 = session.post(URL + f"/admin/book/{book_id}", files=files, data=data)
     res3.raise_for_status()
@@ -131,7 +130,10 @@ def convert_and_upload_book(book_id: int):
 
 
 def update_books():
-    print(f"Updating books with force={FORCE_CONVERSION}")
+    print(
+        f"Updating books with force={FORCE_CONVERSION} "
+        f"and disable-token={DISABLE_LOGIN_TOKEN}"
+    )
     login()
     ids = get_books()
     for book_id in ids:

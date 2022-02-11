@@ -11,6 +11,7 @@ In order to run it, the following env vars must be set:
 There are others optional env vars:
 
 - `FORCE_CONVERSION`: if `true` the script will convert and update **all** books, not just the ones without an `azw3` version.
+- `DISABLE_LOGIN_TOKEN`: if `true` the script will not try to find the `csrf_token`. Useful to support old versions of calibre-web which doesn't implement this security feature.
 
 ## Development
 
