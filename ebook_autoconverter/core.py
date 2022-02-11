@@ -39,6 +39,12 @@ def get_books():
     soup = BeautifulSoup(res.text, "html.parser")
 
     pags = soup.find("div", {"class": "pagination"})
+    if pags is None:
+        ids = find_books(res)
+        ids.sort()
+        print(f"Found {len(ids)} books (no pages): {ids}")
+        return ids
+
     pages = set()
     for link in pags.find_all("a"):
         pages.add(link["href"])
@@ -48,13 +54,12 @@ def get_books():
         for link in pages:
             res_extra = session.get(URL + link)
             res_extra.raise_for_status()
-            new_ids = find_books(res_extra)
-            ids += new_ids
+            ids += find_books(res_extra)
     else:
         ids = find_books(res)
 
     ids.sort()
-    print(f"Found {len(ids)} books in {len(pages)} pages: {ids}")
+    print(f"Found {len(ids)} books ({len(pages)} pages): {ids}")
     return ids
 
 
@@ -103,7 +108,7 @@ def convert_and_upload_book(book_id: int):
     if token_container is None:
         raise ValueError(f"Can't find token (res={res2}, url={res2.url})")
 
-    token = token_container["token"]
+    token = token_container["value"]
 
     files = {"btn-upload-format": open(azw3_path, "rb")}
     data = {"csrf_token": token}
