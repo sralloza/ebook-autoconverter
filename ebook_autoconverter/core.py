@@ -39,6 +39,12 @@ def get_books():
     soup = BeautifulSoup(res.text, "html.parser")
 
     pags = soup.find("div", {"class": "pagination"})
+    if pags is None:
+        ids = find_books(res)
+        ids.sort()
+        print(f"Found {len(ids)} books (no pages): {ids}")
+        return ids
+
     pages = set()
     for link in pags.find_all("a"):
         pages.add(link["href"])
@@ -54,7 +60,7 @@ def get_books():
         ids = find_books(res)
 
     ids.sort()
-    print(f"Found {len(ids)} books in {len(pages)} pages: {ids}")
+    print(f"Found {len(ids)} books ({len(pages)} pages): {ids}")
     return ids
 
 
