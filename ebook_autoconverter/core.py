@@ -54,8 +54,7 @@ def get_books():
         for link in pages:
             res_extra = session.get(URL + link)
             res_extra.raise_for_status()
-            new_ids = find_books(res_extra)
-            ids += new_ids
+            ids += find_books(res_extra)
     else:
         ids = find_books(res)
 
