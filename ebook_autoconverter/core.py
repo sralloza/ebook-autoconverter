@@ -109,7 +109,7 @@ def convert_and_upload_book(book_id: int):
     if token_container is None:
         raise ValueError(f"Can't find token (res={res2}, url={res2.url})")
 
-    token = token_container["token"]
+    token = token_container["value"]
 
     files = {"btn-upload-format": open(azw3_path, "rb")}
     data = {"csrf_token": token}
