@@ -24,6 +24,8 @@ docker push sralloza/ebook-autoconverter:$VERSION
 
 ## Run container
 
+**Note: if the calibre-web server is in the same machine as the one you are running this script you must append `--network="host"` to the `docker run` command. If you don't do this, the container will try to connect to itself and the command will fail.
+
 Using `-e` flags:
 
 ```shell
