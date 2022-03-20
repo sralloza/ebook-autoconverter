@@ -180,5 +180,6 @@ def update_books():
             Status.process_book(res)
     else:
         print("No missing convertions")
+
     Status.print_report()
     logout()
