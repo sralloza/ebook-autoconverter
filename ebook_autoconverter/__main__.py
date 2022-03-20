@@ -1,3 +1,5 @@
+"""Module to make package executable."""
+
 from time import time
 
 from .core import update_books
