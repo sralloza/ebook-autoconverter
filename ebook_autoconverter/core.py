@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import List
 
 from bs4 import BeautifulSoup
-from requests import Response
+from requests import Response, Session
 
 from .calibre import convert_ebook
 from .config import FORCE_CONVERSION, PASSWORD, URL, USERNAME
@@ -11,8 +11,7 @@ from .network import get_session
 from .status import Status
 
 
-def login():
-    session = get_session()
+def login(session: Session):
     res = session.get(URL + "/login")
     res.raise_for_status()
     soup = BeautifulSoup(res.text, "html.parser")
@@ -39,8 +38,7 @@ def login():
     res.raise_for_status()
 
 
-def logout():
-    session = get_session()
+def logout(session: Session):
     res = session.get(URL + "/logout")
     res.raise_for_status()
 
@@ -52,8 +50,7 @@ def logout():
         raise LogoutError("Error during logout")
 
 
-def check_missing_convertions() -> bool:
-    session = get_session()
+def check_missing_convertions(session: Session) -> bool:
     res = session.get(URL + "/formats")
     res.raise_for_status()
 
@@ -72,8 +69,7 @@ def check_missing_convertions() -> bool:
     return len(list(set(list(format_report.values())))) != 1
 
 
-def get_books():
-    session = get_session()
+def get_books(session: Session):
     res = session.get(URL)
     res.raise_for_status()
     soup = BeautifulSoup(res.text, "html.parser")
@@ -114,26 +110,24 @@ def find_books(res: Response) -> List[int]:
     return ids
 
 
-def process_book(book_id: int, force: bool = False) -> bool:
+def process_book(session: Session, book_id: int, force: bool = False) -> bool:
     """Processes a book. Returns true if the book was processed."""
     if force:
         print(f"Force fixing book {book_id}")
-        convert_and_upload_book(book_id)
+        convert_and_upload_book(session, book_id)
         return True
 
-    session = get_session()
     res = session.head(URL + f"/download/{book_id}/azw3/x")
     if res.status_code == 404:
         print(f"Fixing book {book_id}")
-        convert_and_upload_book(book_id)
+        convert_and_upload_book(session, book_id)
         return True
 
     print(f"Book {book_id} is OK")
     return False
 
 
-def convert_and_upload_book(book_id: int):
-    session = get_session()
+def convert_and_upload_book(session: Session, book_id: int):
     ebook_path = Path("tmp.epub")
     res1 = session.get(URL + f"/download/{book_id}/epub/x")
     res1.raise_for_status()
@@ -171,15 +165,17 @@ def convert_and_upload_book(book_id: int):
 
 def update_books():
     print(f"Updating books with force={FORCE_CONVERSION}")
-    login()
 
-    if check_missing_convertions():
-        ids = get_books()
+    session = get_session()
+    login(session)
+
+    if check_missing_convertions(session):
+        ids = get_books(session)
         for book_id in ids:
-            res = process_book(book_id, force=FORCE_CONVERSION)
+            res = process_book(session, book_id, force=FORCE_CONVERSION)
             Status.process_book(res)
     else:
         print("No missing convertions")
 
     Status.print_report()
-    logout()
+    logout(session)
