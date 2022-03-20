@@ -8,6 +8,7 @@ from .calibre import convert_ebook
 from .config import FORCE_CONVERSION, PASSWORD, URL, USERNAME
 from .exceptions import LogoutError
 from .network import get_session
+from .status import Status
 
 
 def login():
@@ -93,18 +94,22 @@ def find_books(res: Response) -> List[int]:
     return ids
 
 
-def process_book(book_id: int, force: bool = False):
+def process_book(book_id: int, force: bool = False) -> bool:
+    """Processes a book. Returns true if the book was processed."""
     if force:
         print(f"Force fixing book {book_id}")
-        return convert_and_upload_book(book_id)
+        convert_and_upload_book(book_id)
+        return True
 
     session = get_session()
     res = session.head(URL + f"/download/{book_id}/azw3/x")
     if res.status_code == 404:
         print(f"Fixing book {book_id}")
-        return convert_and_upload_book(book_id)
+        convert_and_upload_book(book_id)
+        return True
 
     print(f"Book {book_id} is OK")
+    return False
 
 
 def convert_and_upload_book(book_id: int):
@@ -147,7 +152,11 @@ def convert_and_upload_book(book_id: int):
 def update_books():
     print(f"Updating books with force={FORCE_CONVERSION}")
     login()
+
     ids = get_books()
     for book_id in ids:
-        process_book(book_id, force=FORCE_CONVERSION)
+        res = process_book(book_id, force=FORCE_CONVERSION)
+        Status.process_book(res)
+
+    Status.print_report()
     logout()
