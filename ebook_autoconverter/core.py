@@ -6,6 +6,7 @@ from requests import Response
 
 from .calibre import convert_ebook
 from .config import FORCE_CONVERSION, PASSWORD, URL, USERNAME
+from .exceptions import LogoutError
 from .network import get_session
 
 
@@ -35,6 +36,19 @@ def login():
     }
     res = session.post(URL + "/login", data=data)
     res.raise_for_status()
+
+
+def logout():
+    session = get_session()
+    res = session.get(URL + "/logout")
+    res.raise_for_status()
+
+    # Check logout correct
+    res = session.get(URL + "/me", allow_redirects=False)
+    res.raise_for_status()
+
+    if not (res.status_code == 302 and res.headers.get("Location")):
+        raise LogoutError("Error during logout")
 
 
 def get_books():
@@ -136,3 +150,4 @@ def update_books():
     ids = get_books()
     for book_id in ids:
         process_book(book_id, force=FORCE_CONVERSION)
+    logout()
