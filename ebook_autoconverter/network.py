@@ -1,10 +1,11 @@
-from functools import lru_cache
+"""Networking module."""
 
 from requests import Session
 
 
-@lru_cache()
-def get_session():
+def get_session() -> Session:
+    """Returns a custom HTTP session"""
+
     session = Session()
     session.headers.update({"User-Agent": "ebook-autoconverter"})
     return session

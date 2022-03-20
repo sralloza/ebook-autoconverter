@@ -1,3 +1,5 @@
+"""Configuration module."""
+
 import os
 import sys
 
