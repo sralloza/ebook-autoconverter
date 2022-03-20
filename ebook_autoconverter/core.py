@@ -52,6 +52,26 @@ def logout():
         raise LogoutError("Error during logout")
 
 
+def check_missing_convertions() -> bool:
+    session = get_session()
+    res = session.get(URL + "/formats")
+    res.raise_for_status()
+
+    soup = BeautifulSoup(res.text, "html.parser")
+    row_cont = soup.find(id="list")
+
+    format_report = {}
+
+    for row in row_cont.find_all(class_="row"):
+        count = int(row.find("span").get_text(strip=True))
+        fmt = row.find("a").get_text(strip=True)
+
+        format_report[fmt] = count
+
+    print(f"Format report: {format_report}")
+    return len(list(set(list(format_report.values())))) != 1
+
+
 def get_books():
     session = get_session()
     res = session.get(URL)
@@ -153,10 +173,12 @@ def update_books():
     print(f"Updating books with force={FORCE_CONVERSION}")
     login()
 
-    ids = get_books()
-    for book_id in ids:
-        res = process_book(book_id, force=FORCE_CONVERSION)
-        Status.process_book(res)
-
+    if check_missing_convertions():
+        ids = get_books()
+        for book_id in ids:
+            res = process_book(book_id, force=FORCE_CONVERSION)
+            Status.process_book(res)
+    else:
+        print("No missing convertions")
     Status.print_report()
     logout()
