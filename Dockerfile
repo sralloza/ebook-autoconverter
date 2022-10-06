@@ -1,6 +1,6 @@
 FROM linuxserver/calibre
 
-ENV GET_POETRY https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py
+ENV GET_POETRY https://install.python-poetry.org
 ENV POETRY_VIRTUALENVS_CREATE=false
 
 RUN apt update && \
