@@ -167,7 +167,7 @@ def convert_and_upload_book(session: Session, book_id: int):
         ) from exc
 
     # pylint: disable=consider-using-with
-    files = {"btn-upload-format": open(azw3_path, "rb")}
+    files = {"btn-upload": open(azw3_path, "rb")}
     data = {"csrf_token": token}
 
     res3 = session.post(URL + f"/admin/book/{book_id}", files=files, data=data)
