@@ -121,6 +121,13 @@ def find_books(res: Response) -> List[int]:
     return ids
 
 
+def check_format_exists(session: Session, book_id: int, fmt: str) -> bool:
+    """Returns true if the format exists."""
+
+    res = session.head(URL + f"/download/{book_id}/{fmt}/x")
+    return res.status_code == 200
+
+
 def process_book(session: Session, book_id: int, force: bool = False) -> bool:
     """Processes a book. Returns true if the book was processed."""
     if force:
@@ -128,8 +135,7 @@ def process_book(session: Session, book_id: int, force: bool = False) -> bool:
         convert_and_upload_book(session, book_id)
         return True
 
-    res = session.head(URL + f"/download/{book_id}/azw3/x")
-    if res.status_code == 404:
+    if not check_format_exists(session, book_id, "azw3"):
         print(f"Fixing book {book_id}")
         convert_and_upload_book(session, book_id)
         return True
@@ -172,6 +178,9 @@ def convert_and_upload_book(session: Session, book_id: int):
 
     res3 = session.post(URL + f"/admin/book/{book_id}", files=files, data=data)
     res3.raise_for_status()
+
+    if not check_format_exists(session, book_id, "azw3"):
+        raise ValueError(f"Upload failed silently for book {book_id}")
 
     ebook_path.unlink()
     azw3_path.unlink()
