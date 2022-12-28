@@ -26,5 +26,7 @@ jobs:
       - name: Install
         run: poetry install
 
-      - name: Run linter
-        run: .github/scripts/lint.sh
+      - name: Run black
+        run: poetry run black --check --diff ebook_autoconverter
+      - name: Run ruff
+        run: poetry run ruff ebook_autoconverter
