@@ -102,6 +102,8 @@ class EbookAutoconverter:
             format_report[fmt] = count
 
         print(f"Format report: {format_report}")
+        if not format_report:
+            return False
         Report.books_total = max(format_report.values())
         if len(format_report.keys()) < 2:
             return True
