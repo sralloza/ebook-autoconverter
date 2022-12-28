@@ -3,7 +3,23 @@ version: "3.8"
 services:
   app:
     build: .
-    env_file:
-      - .env
+    environment:
+      CALIBRE_WEB_URL: http://calibre-web:8083
+      CALIBRE_WEB_USERNAME: admin
+      CALIBRE_WEB_PASSWORD: admin123
     volumes:
       - /tmp:/tmp
+
+  calibre-web:
+    # set version from https://hub.docker.com/r/linuxserver/calibre-web/tags
+    # or from https://github.com/janeczku/calibre-web/tags
+    image: linuxserver/calibre-web:${CALIBRE_WEB_VERSION:-0.6.19}
+    container_name: calibre-web
+    restart: unless-stopped
+    volumes:
+      - ./test/data/books:/books
+      - ./test/data/config:/config
+    environment:
+      TZ: Europe/Madrid
+    ports:
+      - 8083:8083
