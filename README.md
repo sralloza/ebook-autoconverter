@@ -8,10 +8,6 @@ In order to run it, the following env vars must be set:
 - `CALIBRE_WEB_USERNAME`: [calibre web](https://docs.linuxserver.io/images/docker-calibre-web) admin username.
 - `CALIBRE_WEB_PASSWORD`: [calibre web](https://docs.linuxserver.io/images/docker-calibre-web) admin password.
 
-There are others optional env vars:
-
-- `FORCE_CONVERSION`: if `true` the script will convert and update **all** books, not just the ones without an `azw3` version.
-
 ## Development
 
 ### Build image

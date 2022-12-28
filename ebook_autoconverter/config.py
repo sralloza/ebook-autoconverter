@@ -1,15 +1,15 @@
 """Configuration module."""
 
-import os
-import sys
+from pydantic import BaseSettings, Field
 
-EXEC = "/usr/bin/ebook-convert"
-try:
-    URL = os.environ["CALIBRE_WEB_URL"]
-    USERNAME = os.environ["CALIBRE_WEB_USERNAME"]
-    PASSWORD = os.environ["CALIBRE_WEB_PASSWORD"]
-except KeyError as exc:
-    print(f"Must set environment variable {exc}")
-    sys.exit(1)
 
-FORCE_CONVERSION = os.getenv("FORCE_CONVERSION", "").lower() == "true"
+class Settings(BaseSettings):
+    """Settings for the application."""
+
+    calibre_executable: str = "/usr/bin/ebook-convert"
+    calibre_web_url: str = Field(..., env="CALIBRE_WEB_URL")
+    calibre_web_username: str = Field(..., env="CALIBRE_WEB_USERNAME")
+    calibre_web_password: str = Field(..., env="CALIBRE_WEB_PASSWORD")
+
+
+settings = Settings()  # type: ignore
