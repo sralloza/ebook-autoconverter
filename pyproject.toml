@@ -1,19 +1,26 @@
 [tool.poetry]
 name = "ebook-autoconverter"
-version = "1.1.0"
-description = ""
-authors = ["Your Name <you@example.com>"]
+version = "2.0.0"
+description = "Downloads epub books from calibre-web, converts them to azw3 and uploads them again."
+authors = ["Diego Alloza González <diego.allozagonzalez@telefonica.com>"]
 
 [tool.poetry.dependencies]
-python = ">=3.7,<3.11"
-requests = "^2.27.1"
+python = "^3.10"
+requests = "^2.28.1"
+selenium = "^4.7.2"
+pydantic = "^1.10.2"
 bs4 = "^0.0.1"
+webdriver-manager = "^3.8.5"
 
 [tool.poetry.dev-dependencies]
-black = {version = "^22.1.0", allow-prereleases = true}
-isort = "^5.10.1"
-pylint = "^2.12.2"
+black = "^22.12.0"
+ruff = "^0.0.198"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 88
+# pyflakes, pycodestyle, isort
+select = ["F", "E", "W", "I", "N", "ARG"]

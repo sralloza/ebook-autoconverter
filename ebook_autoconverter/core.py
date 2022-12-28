@@ -1,206 +1,211 @@
 """Core module."""
 
+import shutil
 from pathlib import Path
+from shutil import which
 from typing import List
 
 from bs4 import BeautifulSoup
 from requests import Response, Session
+from selenium import webdriver
+from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.support import expected_conditions
+from selenium.webdriver.support.wait import WebDriverWait
+from webdriver_manager.firefox import GeckoDriverManager
 
 from .calibre import convert_ebook
-from .config import FORCE_CONVERSION, PASSWORD, URL, USERNAME
-from .exceptions import LogoutError
-from .network import get_session
+from .config import settings
 from .report import Report
 
 
-def login(session: Session):
-    """Logs in calibre-web."""
-    res = session.get(URL + "/login")
-    res.raise_for_status()
-    soup = BeautifulSoup(res.text, "html.parser")
-    token_container = soup.find("input", {"name": "csrf_token"})
+class EbookAutoconverter:
+    def __init__(self):
+        self._driver: webdriver.Firefox | None = None
+        self.session = Session()
+        self.session.headers.update({"User-Agent": "ebook-autoconverter"})
 
-    if token_container is None:
-        raise ValueError(f"Can't find token (res={res}, url={res.url})")
+    @property
+    def driver(self) -> webdriver.Firefox:
+        return self._driver
 
-    try:
-        token = token_container["value"]
-    except KeyError as exc:
-        raise KeyError(
-            f"Can't get token from token container ({token_container})"
-        ) from exc
+    def load_webdriver(self):
+        if self._driver is None:
+            options = Options()
+            options.headless = True
 
-    data = {
-        "next": "/",
-        "csrf_token": token,
-        "username": USERNAME,
-        "password": PASSWORD,
-        "submit": "",
-    }
-    res = session.post(URL + "/login", data=data)
-    res.raise_for_status()
+            path = (
+                "geckodriver"
+                if which("geckodriver")
+                else GeckoDriverManager().install()
+            )
+            self._driver = webdriver.Firefox(options=options, executable_path=path)
+            self.login()
 
+    def login(self):
+        """Logs in calibre-web."""
+        self.driver.get(settings.calibre_web_url + "/login")
+        self.driver.find_element("id", "username").send_keys(
+            settings.calibre_web_username
+        )
+        self.driver.find_element("id", "password").send_keys(
+            settings.calibre_web_password
+        )
+        self.driver.find_element("name", "submit").click()
+        if self.driver.current_url == settings.calibre_web_url + "/login":
+            raise ValueError(f"Login failed: {self.driver.current_url!r}")
 
-def logout(session: Session):
-    """Logs out of calibre-web."""
+    def logout(self):
+        """Logs out of calibre-web."""
+        if self._driver:
+            self.driver.get(settings.calibre_web_url + "/logout")
+            if self.driver.current_url != settings.calibre_web_url + "/login":
+                raise ValueError(f"Logout failed: {self.driver.current_url!r}")
 
-    res = session.get(URL + "/logout")
-    res.raise_for_status()
+    def upload_book(self, book_id: int, azw3_path: str):
+        """Uploads a book to calibre-web."""
+        self.load_webdriver()
+        self.driver.get(settings.calibre_web_url + f"/admin/book/{book_id}")
+        self.driver.find_element("id", "btn-upload-format").send_keys(azw3_path)
+        self.clear_empty_identifier_types_in_form()
+        self.driver.find_element("id", "submit").click()
+        element_present = expected_conditions.presence_of_element_located(
+            ("id", "title")
+        )
+        WebDriverWait(self.driver, 20).until(element_present)
 
-    # Check logout correct
-    res = session.get(URL + "/me", allow_redirects=False)
-    res.raise_for_status()
+    def clear_empty_identifier_types_in_form(self):
+        identifiers_table = self.driver.find_element("id", "identifier-table")
+        rows = identifiers_table.find_elements("tag name", "tr")
+        for row in rows:
+            identifier_type = row.find_element(
+                "class name", "form-control"
+            ).get_attribute("value")
+            if not identifier_type:
+                print("Removing identifier empty identifier")
+                row.find_element("class name", "btn-default").click()
 
-    if not (res.status_code == 302 and res.headers.get("Location")):
-        raise LogoutError("Error during logout")
+    def check_missing_convertions(self) -> bool:
+        """Returns true if the number of files in each format are not equal."""
 
+        res = self.session.get(settings.calibre_web_url + "/formats")
+        res.raise_for_status()
 
-def check_missing_convertions(session: Session) -> bool:
-    """Returns true if the number of files in each format are not equal."""
+        soup = BeautifulSoup(res.text, "html.parser")
+        row_cont = soup.find(id="list")
 
-    res = session.get(URL + "/formats")
-    res.raise_for_status()
+        format_report = {}
 
-    soup = BeautifulSoup(res.text, "html.parser")
-    row_cont = soup.find(id="list")
+        for row in row_cont.find_all(class_="row"):
+            count = int(row.find("span").get_text(strip=True))
+            fmt = row.find("a").get_text(strip=True)
 
-    format_report = {}
+            format_report[fmt] = count
 
-    for row in row_cont.find_all(class_="row"):
-        count = int(row.find("span").get_text(strip=True))
-        fmt = row.find("a").get_text(strip=True)
+        print(f"Format report: {format_report}")
+        Report.books_total = max(format_report.values())
+        if len(format_report.keys()) < 2:
+            return True
+        return len(set(format_report.values())) > 1
 
-        format_report[fmt] = count
+    def get_missing_converted_ebooks(self) -> list[int]:
+        epub_ids = self.get_books("/formats/stored/epub")
+        azw3_ids = self.get_books("/formats/stored/azw3")
+        return list(set(epub_ids) - set(azw3_ids))
 
-    print(f"Format report: {format_report}")
-    return len(list(set(list(format_report.values())))) != 1
+    def get_books(self, path: str) -> list[int]:
+        """Returns the book IDs found."""
 
+        res = self.session.get(settings.calibre_web_url + path)
+        if res.status_code == 404:
+            return []
 
-def get_books(session: Session) -> List[int]:
-    """Returns the book IDs found."""
+        res.raise_for_status()
+        soup = BeautifulSoup(res.text, "html.parser")
 
-    res = session.get(URL)
-    res.raise_for_status()
-    soup = BeautifulSoup(res.text, "html.parser")
+        pags = soup.find("div", {"class": "pagination"})
+        if pags is None:
+            ids = self.find_books(res)
+            ids.sort()
+            print(f"Found {len(ids)} books in {path} (no pages): {ids}")
+            return ids
 
-    pags = soup.find("div", {"class": "pagination"})
-    if pags is None:
-        ids = find_books(res)
+        pages = set()
+        for link in pags.find_all("a"):
+            pages.add(link["href"])
+
+        if len(pages) > 1:
+            ids = []
+            for link in pages:
+                res_extra = self.session.get(settings.calibre_web_url + link)
+                res_extra.raise_for_status()
+                ids += self.find_books(res_extra)
+        else:
+            ids = self.find_books(res)
+
         ids.sort()
-        print(f"Found {len(ids)} books (no pages): {ids}")
+        print(f"Found {len(ids)} books in {path} ({len(pages)} pages): {ids}")
         return ids
 
-    pages = set()
-    for link in pags.find_all("a"):
-        pages.add(link["href"])
+    @staticmethod
+    def find_books(res: Response) -> List[int]:
+        """Finds all the book IDs given an HTTP response."""
 
-    if len(pages) > 1:
-        ids = []
-        for link in pages:
-            res_extra = session.get(URL + link)
-            res_extra.raise_for_status()
-            ids += find_books(res_extra)
-    else:
-        ids = find_books(res)
+        soup = BeautifulSoup(res.text, "html.parser")
+        covers = soup.find_all("div", {"class": "meta"})
+        links = []
+        for cover in covers:
+            links.append(cover.a["href"])
 
-    ids.sort()
-    print(f"Found {len(ids)} books ({len(pages)} pages): {ids}")
-    return ids
+        ids = [int(x.split("/")[-1]) for x in links]
+        return ids
 
+    def check_format_exists(self, book_id: int, fmt: str) -> bool:
+        """Returns true if the format exists."""
 
-def find_books(res: Response) -> List[int]:
-    """Finds all the book IDs given an HTTP response."""
+        res = self.session.head(
+            settings.calibre_web_url + f"/download/{book_id}/{fmt}/x"
+        )
+        return res.status_code == 200
 
-    soup = BeautifulSoup(res.text, "html.parser")
-    covers = soup.find_all("div", {"class": "meta"})
-    links = []
-    for cover in covers:
-        links.append(cover.a["href"])
+    def convert_and_upload_book(self, book_id: int):
+        """Converts and uploads a book using the calibre executable."""
 
-    ids = [int(x.split("/")[-1]) for x in links]
-    return ids
+        ebook_path = Path(f"/tmp/ebook_autoconverter/book-{book_id}.epub")
+        folder = ebook_path.parent
+        shutil.rmtree(folder, ignore_errors=True)
+        folder.mkdir(parents=True, exist_ok=True)
+        res1 = self.session.get(
+            settings.calibre_web_url + f"/download/{book_id}/epub/x"
+        )
+        res1.raise_for_status()
+        ebook_path.write_bytes(res1.content)
 
+        azw3_path = convert_ebook(ebook_path.as_posix())
+        # azw3_path = ebook_path.with_suffix(".azw3")
 
-def check_format_exists(session: Session, book_id: int, fmt: str) -> bool:
-    """Returns true if the format exists."""
+        self.upload_book(book_id, azw3_path.as_posix())
 
-    res = session.head(URL + f"/download/{book_id}/{fmt}/x")
-    return res.status_code == 200
+        if not self.check_format_exists(book_id, "azw3"):
+            raise ValueError(f"Upload failed silently for book {book_id}")
 
-
-def process_book(session: Session, book_id: int, force: bool = False) -> bool:
-    """Processes a book. Returns true if the book was processed."""
-    if force:
-        print(f"Force fixing book {book_id}")
-        convert_and_upload_book(session, book_id)
-        return True
-
-    if not check_format_exists(session, book_id, "azw3"):
-        print(f"Fixing book {book_id}")
-        convert_and_upload_book(session, book_id)
-        return True
-
-    print(f"Book {book_id} is OK")
-    return False
-
-
-def convert_and_upload_book(session: Session, book_id: int):
-    """Converts and uploads a book using the calibre executable."""
-
-    ebook_path = Path("tmp.epub")
-    res1 = session.get(URL + f"/download/{book_id}/epub/x")
-    res1.raise_for_status()
-    ebook_path.write_bytes(res1.content)
-    try:
-        azw3_path = convert_ebook("tmp.epub")
-    except:
         ebook_path.unlink()
-        raise
+        azw3_path.unlink()
 
-    res2 = session.get(URL + f"/admin/book/{book_id}")
-    res2.raise_for_status()
-    soup = BeautifulSoup(res2.text, "html.parser")
-    token_container = soup.find("input", {"name": "csrf_token"})
+    @classmethod
+    def update_books(cls):
+        """Ensure all books are converted."""
 
-    if token_container is None:
-        raise ValueError(f"Can't find token (res={res2}, url={res2.url})")
+        self = cls()
+        print("Updating books")
 
-    try:
-        token = token_container["value"]
-    except KeyError as exc:
-        raise KeyError(
-            f"Can't get token from token container ({token_container})"
-        ) from exc
+        if self.check_missing_convertions():
+            ids = self.get_missing_converted_ebooks()
+            print(f"Missing convertions: {ids}")
+            for book_id in ids:
+                self.convert_and_upload_book(book_id)
+                Report.books_converted += 1
+        else:
+            print("No missing convertions")
 
-    # pylint: disable=consider-using-with
-    files = {"btn-upload": open(azw3_path, "rb")}
-    data = {"csrf_token": token}
-
-    res3 = session.post(URL + f"/admin/book/{book_id}", files=files, data=data)
-    res3.raise_for_status()
-
-    if not check_format_exists(session, book_id, "azw3"):
-        raise ValueError(f"Upload failed silently for book {book_id}")
-
-    ebook_path.unlink()
-    azw3_path.unlink()
-
-
-def update_books():
-    """Ensure all books are converted."""
-
-    print(f"Updating books with force={FORCE_CONVERSION}")
-
-    session = get_session()
-    login(session)
-
-    if check_missing_convertions(session):
-        ids = get_books(session)
-        for book_id in ids:
-            res = process_book(session, book_id, force=FORCE_CONVERSION)
-            Report.process_book(res)
-    else:
-        print("No missing convertions")
-
-    Report.print_report()
-    logout(session)
+        Report.print_report()
+        self.logout()
