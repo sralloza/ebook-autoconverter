@@ -1,4 +1,4 @@
-FROM linuxserver/calibre
+FROM linuxserver/calibre:6.10.0
 
 ENV GET_POETRY https://install.python-poetry.org
 ENV POETRY_VIRTUALENVS_CREATE=false
