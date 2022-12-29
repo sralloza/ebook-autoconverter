@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ebook-autoconverter"
-version = "2.0.0"
+version = "2.1.0-rc1"
 description = "Downloads epub books from calibre-web, converts them to azw3 and uploads them again."
 authors = ["Diego Alloza González <diego.allozagonzalez@telefonica.com>"]
 
